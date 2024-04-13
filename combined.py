@@ -13,8 +13,12 @@ NUM_CHANNELS = 8
 NUM_SERVOS = 16
 FRAME_START_THRESHOLD = 6000
 AILERON_CHANNEL = 1
+ELEVATOR_CHANNEL = 2
 THROTTLE_CHANNEL = 3
+RUDDER_CHANNEL = 4
+RUDDER_2_CHANNEL = 6
 ESC_GPIO = 18
+MAX_ANGLE_HORIZONTAL_TAIL = 43.59
 
 #sensors
 i2c = board.I2C()
@@ -31,6 +35,7 @@ if not pi.connected:
 	
 pi.set_mode(ESC_GPIO,pigpio.OUTPUT)
 pi.set_PWM_frequency(ESC_GPIO,50)
+
 
 telemetry_file = "telemetry_data.csv"
 with open(telemetry_file, "a") as file:
@@ -56,10 +61,6 @@ def handle_ppm():
 		safe_pulse_width = max(1000, min(2000, pulse_width))
 		pi.set_servo_pulsewidth(ESC_GPIO,safe_pulse_width)
 
-	def set_servo_angle(channel,angle):
-		clamped_angle = max(0,min(180,angle))
-		kit.servo[channel].angle = clamped_angle
-
 	def cbf(gpio, level, tick):
 		nonlocal start_tick, durations,frame_start_detected
 		if start_tick is not None:
@@ -71,20 +72,42 @@ def handle_ppm():
 			elif frame_start_detected:
 				durations.append(duration)
 				if len(durations) == NUM_CHANNELS:
-					aileron_angle = duration_to_angle(durations[AILERON_CHANNEL - 1])
-					throttle_pulse = durations[THROTTLE_CHANNEL - 1]
+					#aileron_angle = duration_to_angle(durations[AILERON_CHANNEL - 1],136.41,170,151.23)
+					#elevator_angle = duration_to_angle(durations[ELEVATOR_CHANNEL - 1],123,57,90)
+					#rudder_angle = duration_to_angle(durations[RUDDER_CHANNEL - 1],49.18,0,23.29)
+					#rudder_two_angle = duration_to_angle(durations[RUDDER_2_CHANNEL - 1],49.18,0,25.89)
 					
-					set_servo_angle(0,aileron_angle)
-					set_esc_throttle(throttle_pulse)
-					print(f"Servo 1 set to {aileron_angle} degrees")
-					print(f"Throttle set to {throttle_pulse} speed")
+					
+					#throttle_pulse = durations[THROTTLE_CHANNEL - 1]
+					
+				
+					#kit.servo[0].angle = aileron_angle
+					#kit.servo[2].angle = elevator_angle
+					#kit.servo[4].angle = rudder_angle
+					#kit.servo[6].angle = rudder_two_angle
+					kit.servo[0].angle = 0
+					#set_esc_throttle(throttle_pulse)
+					#print(f"Servo 1 set to {aileron_angle} degrees")
+					#print(f"Servo 2 set to {elevator_angle} degrees")
+					#print(f"Servo 3 set to {rudder_angle} degrees")
+					#print(f"Servo 4 set to {rudder_two_angle} degrees")
+					#print(f"Throttle set to {throttle_pulse} speed")
 					 
 		start_tick = tick
 
 
-	def duration_to_angle(duration):
-		angle = (duration-1000)/1000*180
-		return max(0,min(angle,180))
+	def duration_to_angle(duration,MAX,MIN,REST):
+		normalized_input = ((duration - 1000) / 1000.0)
+		
+		if normalized_input <0.5:
+			
+			angle = REST - (0.5 - normalized_input) * 2 * (REST-MIN)
+		else:
+			angle = REST +(normalized_input - 0.5) * 2 * (MAX - REST)
+			
+		angle = max(MIN,min(MAX,angle))
+		return angle
+		
 		
 	cb = pi.callback(GPIO_PIN, pigpio.RISING_EDGE, cbf)
 	while True:
